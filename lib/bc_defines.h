@@ -16,9 +16,9 @@
 #define MAX_BLOCK 15
 #define MAXTX 10 // nb tx par bloc (tests)
 #define DIFFICULTY 4 // difficulté pour le minage
-#define INITIALREWARD 50*1000 // montant de départ de la récompence des mineurs
+#define INITIALREWARD 1000 // récompense du mineur (BTC)
 #define HELIREWARD 100*1000 // montant de l'helicopter money
-#define MAX_USERS 3 // nb utilisateurs (tests)
+#define MAX_USERS 10 // nb utilisateurs (tests)
 #define LOCK_SCRIPT_SIZE 4 // (parties 2 et 3)
 #define UNLOCK_SCRIPT_SIZE 3 // (parties 2 et 3)
 #define FEE_RATE 5 //%

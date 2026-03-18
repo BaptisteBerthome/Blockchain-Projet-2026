@@ -1,0 +1,94 @@
+{
+"Name": "bit thune",
+"Money supply": 150000,
+"blockchain":{"Difficulty": 4,
+"Nb blocks": 4,
+"Actual reward": 50000,
+"blocks":[
+{"index": 3,
+"time stamp": "Tue Nov 25 13:14:05 2025",
+"previous hash": "0000e8b8606fe8f2118e5abf09359459d56f8464fa446d7ab06dfe941cd20720",
+"Nb tx": 1,
+"transactions":[
+{
+"TxId": "eee732c8bca9f0227d8066cf093216da3dd0d09ea3c1867b54ea852fd2f728d2","Timestamp": "Tue Nov 25 13:14:05 2025", "Sender": "coinbase", "Receiver": "user3", "Amount": 50000, "Nb inputs": 0, "Inputs list":
+[
+],
+"Nb outputs": 1, "Outputs list": 
+[
+{"out index": 0, "Catégorie": "helicopter", "Timestamp": "Tue Nov 25 13:14:05 2025", "lock": "<tx sign user3><pubKeyuser3>DUPHASH","Amount": 50000}
+],
+"Comments": "helicopterMoney"}
+],
+"Merkle root": "674e53ac5e0525209586de2c71b8e57e43aefaca77a493667baf24e4158d4f29",
+"current hash": "0000dda1ed7d736afc07869140537d0d52a2d7146207fa5ee0d2eb354633efaa",
+"nonce": 99576,
+"miner name": "coinbase",
+"comment": "helicopter"
+}
+,{"index": 2,
+"time stamp": "Tue Nov 25 13:14:04 2025",
+"previous hash": "00002aeb24e71cf7fe3510349ee2f7f64b7792295b0cd758bb664d952e2966f3",
+"Nb tx": 1,
+"transactions":[
+{
+"TxId": "0cd6a7be97004503640a47d5cc93440bf6dc28056688318dba5cd54666c295ea","Timestamp": "Tue Nov 25 13:14:04 2025", "Sender": "coinbase", "Receiver": "user2", "Amount": 50000, "Nb inputs": 0, "Inputs list":
+[
+],
+"Nb outputs": 1, "Outputs list": 
+[
+{"out index": 0, "Catégorie": "helicopter", "Timestamp": "Tue Nov 25 13:14:04 2025", "lock": "<tx sign user2><pubKeyuser2>DUPHASH","Amount": 50000}
+],
+"Comments": "helicopterMoney"}
+],
+"Merkle root": "d04b48c7a28646fa10dcb666b43f6a1b7bdf9911fb6728b3722e53cf607fea46",
+"current hash": "0000e8b8606fe8f2118e5abf09359459d56f8464fa446d7ab06dfe941cd20720",
+"nonce": 47923,
+"miner name": "coinbase",
+"comment": "helicopter"
+}
+,{"index": 1,
+"time stamp": "Tue Nov 25 13:14:04 2025",
+"previous hash": "cf577645de10bd3fca20d163fe2eeb232f30d7066b7e1216a64ce38383ebc4cc",
+"Nb tx": 1,
+"transactions":[
+{
+"TxId": "3512330f9ae05dcc9414da47932d56ca9ad83bdaefeb7578e455ca6b9a0719e5","Timestamp": "Tue Nov 25 13:14:04 2025", "Sender": "coinbase", "Receiver": "user1", "Amount": 50000, "Nb inputs": 0, "Inputs list":
+[
+],
+"Nb outputs": 1, "Outputs list": 
+[
+{"out index": 0, "Catégorie": "helicopter", "Timestamp": "Tue Nov 25 13:14:04 2025", "lock": "<tx sign user1><pubKeyuser1>DUPHASH","Amount": 50000}
+],
+"Comments": "helicopterMoney"}
+],
+"Merkle root": "e27146f7dd49897bfba8db9e95093bd4ddf574fd52f1bb34fc2d876d9a6c946a",
+"current hash": "00002aeb24e71cf7fe3510349ee2f7f64b7792295b0cd758bb664d952e2966f3",
+"nonce": 47870,
+"miner name": "coinbase",
+"comment": "helicopter"
+}
+,{"index": 0,
+"time stamp": "Tue Nov 25 13:14:04 2025",
+"previous hash": "NULL",
+"Nb tx": 1,
+"transactions":[
+{
+"TxId": "3142c824309ff04945ee04fa660390965c1e75cf15320c83014c86cd3d35e38f","Timestamp": "Tue Nov 25 13:14:04 2025", "Sender": "coinbase", "Receiver": "coinbase", "Amount": 0, "Nb inputs": 0, "Inputs list":
+[
+],
+"Nb outputs": 1, "Outputs list": 
+[
+{"out index": 0, "Catégorie": "genesis", "Timestamp": "Tue Nov 25 13:14:04 2025", "lock": "<tx sign coinbase><pubKeycoinbase>DUPHASH","Amount": 0}
+],
+"Comments": "ex nihilo"}
+],
+"Merkle root": "6fce854563189e1dad0f76613c7136de22e32868e531b9890100c5c3349478df",
+"current hash": "cf577645de10bd3fca20d163fe2eeb232f30d7066b7e1216a64ce38383ebc4cc",
+"nonce": 0,
+"miner name": "none",
+"comment": "genesis"
+}
+]
+}
+}
