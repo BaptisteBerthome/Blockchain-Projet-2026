@@ -1,12 +1,46 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
-#include "bc_defines.h"
-#include "utils.h"
+#include <time.h>
+#include "../include/blockchain_state.h"
+#include "../include/blockchain_core.h"
+#include "../include/utils.h"
+#include "../include/bc_defines.h"
+#include "../include/blockchain_io.h"
+
+//Variable global a modifier
+
+Blockchain blockchain;
+Account wallets[MAX_USERS];
+int nb_utilisateurs = 3;  // On commence avec 3 users : user1, user2, user3
+bool est_prete = false;   // Pour éviter d'initialiser deux fois
+
 
 //fonciton du menu (à compléter)
 
 void action_initialiser() {
     printf("\n[INFO] Initialisation (Genesis + Helicopter Money)...\n");
+    if (est_prete) {
+            printf("\n[!] La blockchain est deja en route !\n");
+            return;
+        }
+    //Configuration initiale
+    blockchain.difficulty = 4; //Nombre de zéros requis
+    blockchain.blocklist = NULL;
+    blockchain.nbBlocks = 0;
+
+    //Création des portefeuilles
+    init_wallets(wallets, nb_utilisateurs);
+
+    //Création du bloc Genesis
+    create_genesis_block(&blockchain);
+
+    //Distribution de l'argent de départ
+    run_helicopter_money(&blockchain, wallets, nb_utilisateurs);
+
+    est_prete = true;
+    printf("\n[OK] Blockchain initialisee avec succès.\n");
+    print_wallets(wallets, nb_utilisateurs);
 }
 
 void action_nouvelle_tx() {
@@ -15,19 +49,41 @@ void action_nouvelle_tx() {
 
 void action_verifier() {
     printf("\n[INFO] Verification de la chaine...\n");
+    if (!est_prete) {
+        printf("Initialisez la blockchain dabord.\n");
+        return;
+    }
+
+    printf("vérification de la chaine...\n");
+
+    // On appelle la fonction de core qui fait le travail mathématique
+    if (verify_chain_integrity(&blockchain)) {
+        printf("CHAINE VALIDE\n");
+    } else {
+        printf("ALERTE : CHAINE CORROMPUE\n");
+    }
+
 }
 
 void action_sauvegarder() {
-    printf("\n[INFO] Sauvegarde JSON...\n");
+    printf("\nSauvegarde JSON...\n");
+    if (!est_prete) {
+        printf("Initialise la blockchain dabord.\n");
+        return;
+    }
+    printf("\n[Sauvegarde en cours dans 'blockchain.json'...\n");
+    save_blockchain_json("blockchain.json", &blockchain, wallets, nb_utilisateurs);
+    printf("Fichier enregistre avec succes !\n");
 }
 
 void action_quitter() {
-    printf("\n[INFO] Fermeture et nettoyage de la memoire...\n");
+    printf("Fermeture et nettoyage de la memoire...\n");
 }
 
 
 //main
 int main() {
+    srand(time(NULL));
     printf("=== Bienvenue dans BIT-THUNE (Projet Blockchain 2026) ===\n");
 
     int choix = 0;

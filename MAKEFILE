@@ -3,7 +3,7 @@ TARGET = bitthune_exec
 
 #Compilateur et options
 CC = gcc
-CFLAGS = -Wall -Wextra -g -Iinclude
+CFLAGS = -Wall -Wextra -g -Iinclude -Ilib -Ilib/Sha256
 #LDFLAGS = -lssl -lcrypto # a decommenter pour la Partie 3 (OpenSSL)
 
 #Dossiers
@@ -12,30 +12,29 @@ LIB_DIR = lib
 OBJ_DIR = obj
 
 #fichiers sources dans src et lib
-SRC_FILES = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(LIB_DIR)/*.c)
+SRC_FILES = $(wildcard $(SRC_DIR)/*.c) \
+            $(LIB_DIR)/Sha256/sha256.c \
+            $(LIB_DIR)/Sha256/sha256_utils.c
 #fichiers objest dans src et lib
 OBJ_FILES = $(patsubst %.c, $(OBJ_DIR)/%.o, $(notdir $(SRC_FILES)))
+vpath %.c $(SRC_DIR) $(LIB_DIR) $(LIB_DIR)/Sha256
+
 
 #Regle principale
 all: $(OBJ_DIR) $(TARGET)
 
-#Creation de l'exécutable
 $(TARGET): $(OBJ_FILES)
 	$(CC) $(OBJ_FILES) -o $@ $(LDFLAGS)
 
-#Compilation des fichiers objets
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/%.o: $(LIB_DIR)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-#Creer le dossier obj s'il n'existe pas
+# Créer le dossier obj s'il n'existe pas
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
-#Nettoyage des fichiers temporaires
+# Nettoyage
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET) *.json
 
 .PHONY: all clean
