@@ -101,7 +101,4 @@ void free_blockchain(Blockchain *bc) {
         
         current_block_node = next_block_node;
     }
-
-    //blockchain vide je la libère
-    free(bc);
 }
