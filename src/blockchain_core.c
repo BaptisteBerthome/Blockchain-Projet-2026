@@ -10,9 +10,11 @@
 
 
 // raccourcis de la fonction hash avec ajout de \0
-void hash_text(char *texte_a_hacher, char resultat_hash[HASHLENGTH]) {
-   sha256ofString((BYTE *)texte_a_hacher, resultat_hash);
-   resultat_hash[HASHLENGTH - 1] = '\0';
+void hash_text(const char *texte_a_hacher, BYTE resultat_hash[HASHLENGTH]) {
+    char hash_tmp[HASHLENGTH];
+    sha256ofString((BYTE *)texte_a_hacher, hash_tmp);
+    memcpy(resultat_hash, hash_tmp, HASHLENGTH);
+    resultat_hash[HASHLENGTH - 1] = '\0';
 }
 
 
@@ -34,19 +36,20 @@ void tx_compute_id(Transaction *tx) {
 
 
 //hash le block
-void compute_block_hash(const Block *block, char result[HASHLENGTH]) {
+void compute_block_hash(const Block *block, BYTE result[HASHLENGTH]) {
    char buffer[1024];
    snprintf(
        buffer,
        sizeof(buffer),
-       "%d|%s|%ld|%s|%s|%ld|%d",
+       "%d|%s|%ld|%s|%s|%ld|%d|%ld",
        block->index,
-       block->previousHash,
+    (char *)block->previousHash,
        (long)block->timestamp,
-       block->merkleTree,
+    (char *)block->merkleTree,
        block->minerName,
        block->nonce,
-       block->nbTx
+       block->nbTx,
+       block->miningReward
    );
    hash_text(buffer, result);
 }
@@ -57,7 +60,7 @@ void compute_block_hash(const Block *block, char result[HASHLENGTH]) {
 
 
 //verifie si le hash commence par le bon nombre de zero
-bool starts_with_zeros(const char *hash, int zeros) {
+bool starts_with_zeros(const BYTE *hash, int zeros) {
    for (int i = 0; i < zeros; i++) {
        if (hash[i] != '0') {
            return false;
@@ -70,7 +73,7 @@ bool starts_with_zeros(const char *hash, int zeros) {
 //fonction de minage
 void mine_block(Block *block, int difficulty) {
    //racine des transactions
-   compute_merkle_root(block->transactions, block->nbTx, (char *)block->merkleTree);
+    compute_merkle_root(block->transactions, block->nbTx, block->merkleTree);
    block->nonce = 0;
 
 
@@ -92,7 +95,7 @@ void mine_block(Block *block, int difficulty) {
 
 
 
-void compute_merkle_root(const Slist *list_tx, int nb_tx, char out_merkle_root[HASHLENGTH]) {
+void compute_merkle_root(const Slist *list_tx, int nb_tx, BYTE out_merkle_root[HASHLENGTH]) {
    //Cas exceptionnel pas de tx
    if (nb_tx <= 0) {
        hash_text("", out_merkle_root);
@@ -100,7 +103,7 @@ void compute_merkle_root(const Slist *list_tx, int nb_tx, char out_merkle_root[H
    }
 
 
-   char level[MAXTX][HASHLENGTH];
+    BYTE level[MAXTX][HASHLENGTH];
    int nb_hash = 0;
 
 
@@ -109,7 +112,7 @@ void compute_merkle_root(const Slist *list_tx, int nb_tx, char out_merkle_root[H
    const Slist *node = list_tx;
    while (node != NULL && nb_hash < nb_tx) {
        Transaction *tx = (Transaction *)node->info;
-       strcpy(level[nb_hash], tx->txid);
+       strcpy((char *)level[nb_hash], (char *)tx->txid);
        nb_hash++;
        node = node->next;
    }
@@ -117,7 +120,7 @@ void compute_merkle_root(const Slist *list_tx, int nb_tx, char out_merkle_root[H
 
    //On monte les étage de l'arbre jusqu'à ce qui est plus qu'un seul hash
    while (nb_hash > 1) {
-       char next_level[MAXTX][HASHLENGTH];
+    BYTE next_level[MAXTX][HASHLENGTH];
        int nb_hash_suivant = 0;
 
 
@@ -144,14 +147,14 @@ void compute_merkle_root(const Slist *list_tx, int nb_tx, char out_merkle_root[H
 
        // On met à jour pour le prochain tour de boucle (on monte d'un étage)
        for (int j = 0; j < nb_hash_suivant; j++) {
-           strcpy(level[j], next_level[j]);
+           strcpy((char *)level[j], (char *)next_level[j]);
        }
        nb_hash = nb_hash_suivant;
    }
 
 
    //boucle finit il reste qu'un seul hash (la racine)
-   strcpy(out_merkle_root, level[0]);
+    strcpy((char *)out_merkle_root, (char *)level[0]);
 
 
 }
@@ -177,20 +180,20 @@ bool verify_chain_integrity(Blockchain *bc) {
 
 
        //Est ce que quelqu'un a modifié une transaction dans ce bloc ?
-       char merkle_hash[HASHLENGTH];
+       BYTE merkle_hash[HASHLENGTH];
        compute_merkle_root(current_block->transactions, current_block->nbTx, merkle_hash);
       
-       if (strcmp(merkle_hash, current_block->merkleTree) != 0) {
+       if (strcmp((char *)merkle_hash, (char *)current_block->merkleTree) != 0) {
            printf("Bloc %d : Une transaction a ete modifiee (Merkle faux)\n", index);
            return false;
        }
 
 
        //Est  ce que les données du bloc correspondent a son hash ?
-       char hash_calcule[HASHLENGTH];
+       BYTE hash_calcule[HASHLENGTH];
        compute_block_hash(current_block, hash_calcule);
       
-       if (strcmp(hash_calcule, current_block->blockHash) != 0) {
+       if (strcmp((char *)hash_calcule, (char *)current_block->blockHash) != 0) {
            printf("Bloc %d : Le hash du bloc est faux\n", index);
            return false;
        }
@@ -200,7 +203,7 @@ bool verify_chain_integrity(Blockchain *bc) {
        if (index > 0 && previous_block != NULL) {
           
            // Le "previousHash" de mon bloc actuel doit être égal au "blockHash" du bloc d'avant
-           if (strcmp(current_block->previousHash, previous_block->blockHash) != 0) {
+           if (strcmp((char *)current_block->previousHash, (char *)previous_block->blockHash) != 0) {
                printf("Bloc %d : Lien casse avec le block precedent\n", index);
                return false;
            }

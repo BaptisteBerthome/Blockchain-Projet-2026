@@ -55,7 +55,8 @@ void print_block_json(FILE *out, const Block *block) {
     fprintf(out, "      \"merkle_root\": \"%s\",\n", block->merkleTree);
     fprintf(out, "      \"current_hash\": \"%s\",\n", block->blockHash);
     fprintf(out, "      \"nonce\": %ld,\n", block->nonce);
-    fprintf(out, "      \"miner\": \"%s\"\n", block->minerName);
+    fprintf(out, "      \"miner\": \"%s\",\n", block->minerName);
+    fprintf(out, "      \"mining_reward\": %ld\n", block->miningReward);
     fprintf(out, "    }");
 }
 

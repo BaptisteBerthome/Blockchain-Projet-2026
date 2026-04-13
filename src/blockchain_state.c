@@ -30,6 +30,15 @@ int find_wallet_by_name(Account wallets[MAX_USERS], int nb_users, const char *na
 //-------- GESTION DES TRANSACTION---------
 
 void add_transaction_to_block(Block *b, const char *sender, const char *receiver, long amount, const char *comment) {
+    if (b == NULL) {
+        printf("Bloc invalide pour ajouter une transaction.\n");
+        return;
+    }
+
+    if (amount < 0) {
+        printf("Montant invalide.\n");
+        return;
+    }
     
     //On vérifie si le bloc n'est pas déjà plein
     //MAXTX défini dans bc_defines.h
@@ -79,6 +88,7 @@ void create_genesis_block(Blockchain *bc) {
         printf("Memoire insuffisante pour creer la transaction.\n");
         return;
     }
+    memset(genesis, 0, sizeof(Block));
     
     //remplissage
     genesis->index = 0;
@@ -92,8 +102,8 @@ void create_genesis_block(Blockchain *bc) {
     add_transaction_to_block(genesis, "Network", "Genesis", 0, "Initial Block");
 
     //calcul du hash
-    compute_merkle_root(genesis->transactions, genesis->nbTx, (char *)genesis->merkleTree);
-    compute_block_hash(genesis, (char *)genesis->blockHash);
+    compute_merkle_root(genesis->transactions, genesis->nbTx, genesis->merkleTree);
+    compute_block_hash(genesis, genesis->blockHash);
 
     //ajout a la structure
     bc->blocklist = Slist_add(bc->blocklist, genesis);
@@ -105,6 +115,26 @@ void create_genesis_block(Blockchain *bc) {
 //------MINAGE ET MISE A JOUR DES SOLDES------
 
 void mine_and_add_block(Blockchain *bc, Block *new_block, Account wallets[MAX_USERS], int nb_users) {
+    if (bc == NULL || new_block == NULL) {
+        printf("Impossible de miner: blockchain ou bloc invalide.\n");
+        return;
+    }
+
+    new_block->index = bc->nbBlocks;
+    if (bc->blocklist != NULL) {
+        Slist *previous_node = bc->blocklist;
+        while (previous_node->next != NULL) {
+            previous_node = previous_node->next;
+        }
+        Block *previous_block = (Block *)previous_node->info;
+        snprintf((char *)new_block->previousHash, HASHLENGTH, "%s", previous_block->blockHash);
+    } else {
+        snprintf((char *)new_block->previousHash, HASHLENGTH, "0");
+    }
+
+    int id_miner = find_wallet_by_name(wallets, nb_users, new_block->minerName);
+    new_block->miningReward = (id_miner != -1) ? bc->reward4mining : 0;
+
     //On mine le bloc(trouver la nonce)
     printf("Recherche de la nonce pour le bloc %d (mining...)\n", new_block->index);
     mine_block(new_block, bc->difficulty);
@@ -131,6 +161,11 @@ void mine_and_add_block(Blockchain *bc, Block *new_block, Account wallets[MAX_US
         }
 
         current = current->next;
+    }
+
+    if (id_miner != -1) {
+        wallets[id_miner].balance += new_block->miningReward;
+        printf("Reward mineur: %s +%ld BT\n", new_block->minerName, new_block->miningReward);
     }
 }
 

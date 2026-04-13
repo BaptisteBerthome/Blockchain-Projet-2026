@@ -44,6 +44,7 @@ typedef struct block {
 	BYTE merkleTree[SHA256_BLOCK_SIZE*2 + 1]; // hash de l'arbre de Merkle
   BYTE blockHash[SHA256_BLOCK_SIZE*2 + 1]; // hash du bloc courant
   char minerName[MAX_STRING]; // nom du mineur
+  long miningReward; // recompense effective versee au mineur pour ce bloc
   char comment[MAX_STRING];
 	long nonce;
 } Block;
