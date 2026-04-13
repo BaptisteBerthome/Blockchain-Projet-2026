@@ -246,6 +246,11 @@ void action_quitter() {
         action_sauvegarder();
     }
     printf("Fermeture et nettoyage de la memoire...\n");
+
+    free_blockchain(&blockchain);
+
+    free(pending_block); 
+    pending_block = NULL;
 }
 
 
