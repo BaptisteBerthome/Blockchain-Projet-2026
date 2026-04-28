@@ -1,5 +1,31 @@
 #include "utils.h"
 
+static void free_tx_outputs_list(Slist *list) {
+    Slist *current = list;
+    while (current != NULL) {
+        Slist *next = current->next;
+        TxOutputs *out = (TxOutputs *)current->info;
+        if (out != NULL) {
+            for (int i = 0; i < LOCK_SCRIPT_SIZE; i++) {
+                free(out->lockingScript[i]);
+            }
+            free(out);
+        }
+        free(current);
+        current = next;
+    }
+}
+
+static void free_tx_inputs_list(Slist *list) {
+    Slist *current = list;
+    while (current != NULL) {
+        Slist *next = current->next;
+        free(current->info);
+        free(current);
+        current = next;
+    }
+}
+
 //Ajouter un élément à la fin de la liste
 Slist* Slist_add(Slist *list, void *new_info) {
     //allocation mémoire
@@ -64,13 +90,14 @@ void free_block(Block *b) {
 
 
         Slist *next_tx_node = current_tx_node->next;
+        Transaction *tx = (Transaction *)current_tx_node->info;
         
-        //On libere le contenue
-        if (current_tx_node->info != NULL) {
-            free(current_tx_node->info); 
+        if (tx != NULL) {
+            free_tx_inputs_list(tx->lstInputs);
+            free_tx_outputs_list(tx->lstOutputs);
+            free(tx);
         }
-        //libere la structure
-        free(current_tx_node); 
+        free(current_tx_node);
         
         current_tx_node = next_tx_node;
     }

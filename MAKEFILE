@@ -6,6 +6,14 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g -Iinclude -Ilib -Ilib/Sha256
 #LDFLAGS = -lssl -lcrypto # a decommenter pour la Partie 3 (OpenSSL)
 
+ifeq ($(OS),Windows_NT)
+MKDIR_P = if not exist $(OBJ_DIR) mkdir $(OBJ_DIR)
+CLEAN_CMD = del /Q $(OBJ_DIR)\\*.o 2>nul & rmdir /S /Q $(OBJ_DIR) 2>nul & del /Q $(TARGET).exe $(TARGET) *.json 2>nul
+else
+MKDIR_P = mkdir -p $(OBJ_DIR)
+CLEAN_CMD = rm -rf $(OBJ_DIR) $(TARGET) *.json
+endif
+
 #Dossiers
 SRC_DIR = src
 LIB_DIR = lib
@@ -31,10 +39,10 @@ $(OBJ_DIR)/%.o: %.c
 
 # Créer le dossier obj s'il n'existe pas
 $(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
+	$(MKDIR_P)
 
 # Nettoyage
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET) *.json
+	$(CLEAN_CMD)
 
 .PHONY: all clean

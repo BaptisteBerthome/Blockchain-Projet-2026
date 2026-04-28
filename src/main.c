@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <time.h>
 #include "../include/blockchain_state.h"
 #include "../include/blockchain_core.h"
@@ -8,13 +9,18 @@
 #include "../include/bc_defines.h"
 #include "../include/blockchain_io.h"
 
-//Variable global a modifier
-
 Blockchain blockchain;
 Account wallets[MAX_USERS];
-int nb_utilisateurs = 3;  // On commence avec 3 users : user1, user2, user3
-bool est_prete = false;   // Pour éviter d'initialiser deux fois
-Block *pending_block = NULL; // Bloc courant qui recoit les nouvelles transactions
+int nb_utilisateurs = 3;
+bool est_prete = false;
+static volatile sig_atomic_t stop_market_loop = 0;
+
+static const int HALVING_LIMIT = 30;
+
+static void on_sigint_market(int sig) {
+    (void)sig;
+    stop_market_loop = 1;
+}
 
 static const char *pick_random_miner_name(void) {
     if (nb_utilisateurs <= 0) {
@@ -24,35 +30,7 @@ static const char *pick_random_miner_name(void) {
     return wallets[random_id].str;
 }
 
-static long get_effective_balance_with_pending(const char *wallet_name) {
-    int wallet_id = find_wallet_by_name(wallets, nb_utilisateurs, wallet_name);
-    if (wallet_id == -1) {
-        return -1;
-    }
-
-    long effective_balance = wallets[wallet_id].balance;
-    if (pending_block == NULL) {
-        return effective_balance;
-    }
-
-    Slist *node = pending_block->transactions;
-    while (node != NULL) {
-        Transaction *tx = (Transaction *)node->info;
-
-        if (strcmp((char *)tx->adSender, wallet_name) == 0) {
-            effective_balance -= tx->txAmount;
-        }
-        if (strcmp((char *)tx->adReceiver, wallet_name) == 0) {
-            effective_balance += tx->txAmount;
-        }
-
-        node = node->next;
-    }
-
-    return effective_balance;
-}
-
-static Block *create_pending_block(const Blockchain *bc) {
+static Block *create_market_block(const Blockchain *bc) {
     Block *b = malloc(sizeof(Block));
     if (b == NULL) {
         return NULL;
@@ -60,82 +38,67 @@ static Block *create_pending_block(const Blockchain *bc) {
 
     memset(b, 0, sizeof(Block));
     b->index = bc->nbBlocks;
-    b->timestamp = (long)time(NULL);
+    b->timestamp = time(NULL);
     snprintf(b->minerName, MAX_STRING, "%s", pick_random_miner_name());
-
-    if (bc->blocklist == NULL) {
-        snprintf((char *)b->previousHash, HASHLENGTH, "0");
-    } else {
-        Slist *last = bc->blocklist;
-        while (last->next != NULL) {
-            last = last->next;
-        }
-        Block *prev = (Block *)last->info;
-        snprintf((char *)b->previousHash, HASHLENGTH, "%s", prev->blockHash);
-    }
-
     return b;
 }
 
-
-//fonciton du menu (à compléter)
+static void advance_reward_schedule(void) {
+    increment_cycle_round();
+    if (get_cycle_rounds() % HALVING_LIMIT == 0) {
+        long reward = get_current_reward();
+        if (reward > 0) {
+            set_current_reward(reward / 2);
+            increment_halving_count();
+            printf("[HALVING] cycle=%d nouvelle reward=%ld BT\n", get_cycle_rounds(), get_current_reward());
+        }
+    }
+}
 
 void action_initialiser() {
     printf("\n[INFO] Initialisation (Genesis + Helicopter Money)...\n");
     if (est_prete) {
-            printf("\n[!] La blockchain est deja en route !\n");
-            return;
-        }
-    //Configuration initiale
-    blockchain.difficulty = 4; //Nombre de zéros requis
-    blockchain.blocklist = NULL;
-    blockchain.nbBlocks = 0;
-
-    //Création des portefeuilles
-    init_wallets(wallets, nb_utilisateurs);
-
-    //Création du bloc Genesis
-    create_genesis_block(&blockchain);
-
-    //Distribution de l'argent de départ
-    run_helicopter_money(&blockchain, wallets, nb_utilisateurs);
-
-    blockchain.reward4mining = INITIALREWARD;
-
-    pending_block = create_pending_block(&blockchain);
-    if (pending_block == NULL) {
-        printf("[ERREUR] Impossible de preparer le prochain bloc.\n");
+        printf("\n[!] La blockchain est deja en route !\n");
         return;
     }
 
+    blockchain.difficulty = DIFFICULTY;
+    blockchain.blocklist = NULL;
+    blockchain.nbBlocks = 0;
+    blockchain.reward4mining = INITIALREWARD;
+
+    reset_utxo_state();
+    set_current_reward(INITIALREWARD);
+
+    init_wallets(wallets, nb_utilisateurs);
+    create_genesis_block(&blockchain);
+    run_helicopter_money(&blockchain, wallets, nb_utilisateurs);
+
     est_prete = true;
-    printf("\n[OK] Blockchain initialisee avec succès.\n");
+    printf("\n[OK] Blockchain initialisee avec succes.\n");
     print_wallets(wallets, nb_utilisateurs);
 }
 
 void action_nouvelle_tx() {
-    printf("\n[INFO] Creation d'une transaction...\n");
+    printf("\n[INFO] Creation d'une transaction UTXO...\n");
     if (!est_prete) {
         printf("Initialisez la blockchain dabord.\n");
         return;
     }
+
     char sender[MAX_STRING];
     char receiver[MAX_STRING];
     long amount;
     char comment[MAX_STRING];
+
     printf("Entrez le nom de l'envoyeur (ex: user1) : ");
-    scanf("%s", sender);
+    scanf("%63s", sender);
     printf("Entrez le nom du receveur (ex: user2) : ");
-    scanf("%s", receiver);
+    scanf("%63s", receiver);
     printf("Entrez le montant en Bit-Thunes : ");
     scanf("%ld", &amount);
     printf("Entrez un commentaire pour la transaction : ");
-    scanf("%s", comment);
-
-    if (pending_block == NULL) {
-        printf("Aucun bloc courant disponible pour ajouter la transaction.\n");
-        return;
-    }
+    scanf("%63s", comment);
 
     if (find_wallet_by_name(wallets, nb_utilisateurs, sender) == -1 ||
         find_wallet_by_name(wallets, nb_utilisateurs, receiver) == -1) {
@@ -148,56 +111,64 @@ void action_nouvelle_tx() {
         return;
     }
 
-    long sender_effective_balance = get_effective_balance_with_pending(sender);
-    if (sender_effective_balance < amount) {
-        printf("Solde insuffisant pour %s: disponible=%ld, demande=%ld\n",
-               sender, sender_effective_balance, amount);
+    Block *block = create_market_block(&blockchain);
+    if (block == NULL) {
+        printf("[ERREUR] Impossible de creer un bloc pour cette transaction.\n");
         return;
     }
 
-    add_transaction_to_block(pending_block, sender, receiver, amount, comment);
-    printf("\n[OK] Transaction ajoutee au bloc en cours.\n");
-
-    if (pending_block->nbTx >= MAXTX) {
-        printf("[INFO] Bloc courant plein (%d tx), minage automatique...\n", MAXTX);
-        pending_block->timestamp = (long)time(NULL);
-        mine_and_add_block(&blockchain, pending_block, wallets, nb_utilisateurs);
-        pending_block = create_pending_block(&blockchain);
-        if (pending_block == NULL) {
-            printf("[ERREUR] Le bloc a ete mine, mais impossible de preparer le prochain.\n");
-        }
-        print_wallets(wallets, nb_utilisateurs);
+    long fee = 0;
+    if (!add_utxo_transaction_to_block(block, wallets, nb_utilisateurs, sender, receiver, amount, comment, &fee)) {
+        printf("Transaction rejetee (solde UTXO insuffisant ou donnees invalides).\n");
+        free(block);
+        return;
     }
 
+    blockchain.reward4mining = get_current_reward();
+    add_coinbase_transaction(block, block->minerName, get_current_reward(), fee);
+    mine_and_add_block(&blockchain, block, wallets, nb_utilisateurs);
 
+    advance_reward_schedule();
+    printf("\n[OK] Bloc mine avec transaction utilisateur.\n");
+    print_wallets(wallets, nb_utilisateurs);
 }
 
 void action_mine_and_add_block() {
-    printf("\n[INFO] Minage et ajout d'un nouveau bloc...\n");
+    printf("\n[INFO] Minage manuel d'un bloc de marche (tx aleatoires)...\n");
     if (!est_prete) {
         printf("Initialisez la blockchain dabord.\n");
         return;
     }
-    if (pending_block == NULL) {
-        printf("Aucun bloc courant a miner.\n");
-        return;
-    }
 
-    if (pending_block->nbTx <= 0) {
-        printf("Le bloc courant est vide. Ajoutez au moins une transaction avant de miner.\n");
-        return;
-    }
+    blockchain.reward4mining = get_current_reward();
+    process_market_round(&blockchain, wallets, nb_utilisateurs, (rand() % (MAXTX - 1)) + 1);
+    advance_reward_schedule();
 
-    pending_block->timestamp = (long)time(NULL);
-    mine_and_add_block(&blockchain, pending_block, wallets, nb_utilisateurs);
-
-    pending_block = create_pending_block(&blockchain);
-    if (pending_block == NULL) {
-        printf("[ERREUR] Le bloc a ete mine, mais impossible de preparer le prochain.\n");
-    }
-
-    printf("\n[OK] Nouveau bloc mine et ajoute a la blockchain.\n");
+    printf("\n[OK] Nouveau bloc de marche ajoute.\n");
     print_wallets(wallets, nb_utilisateurs);
+}
+
+void action_phase_marche() {
+    printf("\n[INFO] Demarrage de la phase marche (Ctrl+C pour arreter)...\n");
+    if (!est_prete) {
+        printf("Initialisez la blockchain dabord.\n");
+        return;
+    }
+
+    stop_market_loop = 0;
+    signal(SIGINT, on_sigint_market);
+
+    while (!stop_market_loop) {
+        blockchain.reward4mining = get_current_reward();
+        process_market_round(&blockchain, wallets, nb_utilisateurs, (rand() % (MAXTX - 1)) + 1);
+        advance_reward_schedule();
+    }
+
+    signal(SIGINT, SIG_DFL);
+    printf("\n[CTRL+C] Arret de la phase marche.\n");
+    printf("[STATS] Masse monetaire: %ld BT\n", get_money_supply());
+    printf("[STATS] Reward courante: %ld BT\n", get_current_reward());
+    printf("[STATS] Nombre de halving: %d\n", get_halving_count());
 }
 
 void action_verifier() {
@@ -225,17 +196,7 @@ void action_sauvegarder() {
         return;
     }
 
-    if (pending_block != NULL && pending_block->nbTx > 0) {
-        printf("\n[INFO] Bloc courant non vide detecte, minage automatique avant sauvegarde...\n");
-        pending_block->timestamp = (long)time(NULL);
-        mine_and_add_block(&blockchain, pending_block, wallets, nb_utilisateurs);
-        pending_block = create_pending_block(&blockchain);
-        if (pending_block == NULL) {
-            printf("[ERREUR] Sauvegarde poursuivie, mais aucun nouveau bloc courant n'a pu etre prepare.\n");
-        }
-    }
-
-    printf("\n[Sauvegarde en cours dans 'blockchain.json'...\n");
+    printf("\n[Sauvegarde en cours dans 'blockchain.json'...]\n");
     save_blockchain_json("blockchain.json", &blockchain, wallets, nb_utilisateurs);
     printf("Fichier enregistre avec succes !\n");
 }
@@ -248,9 +209,7 @@ void action_quitter() {
     printf("Fermeture et nettoyage de la memoire...\n");
 
     free_blockchain(&blockchain);
-
-    free(pending_block); 
-    pending_block = NULL;
+    reset_utxo_state();
 }
 
 
@@ -262,14 +221,15 @@ int main() {
     int choix = 0;
 
     //choix
-    while (choix != 6) {
+    while (choix != 7) {
         printf("\n=== MENU PRINCIPAL ===\n");
         printf("1. Initialiser la blockchain\n");
-        printf("2. Creer une nouvelle transaction\n");
-        printf("3. Miner et ajouter un nouveau bloc\n");
+        printf("2. Creer une transaction UTXO\n");
+        printf("3. Miner un bloc de marche\n");
         printf("4. Verifier la chaine\n");
         printf("5. Sauvegarder en JSON\n");
-        printf("6. Quitter\n");
+        printf("6. Lancer la phase marche (infinie)\n");
+        printf("7. Quitter\n");
         printf("Votre choix : ");
         
         //sécurité si l'utilisateur tape une lettre au lieu d'un chiffre
@@ -298,10 +258,13 @@ int main() {
                 action_sauvegarder();
                 break;
             case 6:
+                action_phase_marche();
+                break;
+            case 7:
                 action_quitter();
                 break;
             default:
-                printf("Choix invalide. Veuillez taper un chiffre entre 1 et 5.\n");
+                printf("Choix invalide. Veuillez taper un chiffre entre 1 et 7.\n");
                 break;
         }
     }

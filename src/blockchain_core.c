@@ -22,8 +22,8 @@ void hash_text(const char *texte_a_hacher, BYTE resultat_hash[HASHLENGTH]) {
 void tx_compute_id(Transaction *tx) {
    char buffer[512]; //tableau vide a hasher
    //remplissage tableau
-   sprintf(buffer, "%ld|%s|%s|%ld|%s",
-           tx->timestamp,
+   sprintf(buffer, "%lld|%s|%s|%ld|%s",
+       (long long)tx->timestamp,
            tx->adSender,
            tx->adReceiver,
            tx->txAmount,

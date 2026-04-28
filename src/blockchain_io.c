@@ -26,6 +26,37 @@ static void print_tx_json(FILE *out, const Transaction *tx) {
     fprintf(out, "        \"Sender\": \"%s\",\n", tx->adSender);
     fprintf(out, "        \"Receiver\": \"%s\",\n", tx->adReceiver);
     fprintf(out, "        \"Amount\": %ld,\n", tx->txAmount);
+    fprintf(out, "        \"NbInputs\": %d,\n", tx->nbInputs);
+    fprintf(out, "        \"NbOutputs\": %d,\n", tx->nbOutputs);
+    fprintf(out, "        \"Outputs\": [\n");
+
+    Slist *out_node = tx->lstOutputs;
+    int idx = 0;
+    while (out_node != NULL) {
+        TxOutputs *tx_out = (TxOutputs *)out_node->info;
+        const char *owner = "UNKNOWN";
+        long amount = 0;
+        int out_index = idx;
+
+        if (tx_out != NULL) {
+            if (tx_out->lockingScript[0] != NULL) {
+                owner = tx_out->lockingScript[0];
+            }
+            amount = tx_out->amount;
+            out_index = tx_out->outIndex;
+        }
+
+        fprintf(out, "          {\"index\": %d, \"owner\": \"%s\", \"amount\": %ld}", out_index, owner, amount);
+        if (out_node->next != NULL) {
+            fprintf(out, ",");
+        }
+        fprintf(out, "\n");
+
+        out_node = out_node->next;
+        idx++;
+    }
+
+    fprintf(out, "        ],\n");
     fprintf(out, "        \"Comments\": \"%s\"\n", tx->comment);
     fprintf(out, "      }");
 }
