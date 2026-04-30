@@ -72,24 +72,14 @@ bool starts_with_zeros(const BYTE *hash, int zeros) {
 
 //fonction de minage
 void mine_block(Block *block, int difficulty) {
-   //racine des transactions
+    //racine des transactions
     compute_merkle_root(block->transactions, block->nbTx, block->merkleTree);
-   block->nonce = 0;
-
-
-   int is_mined = 0;
-   while (is_mined == 0) {
-
-
-       compute_block_hash(block, block->blockHash);
-
-
-       if (starts_with_zeros(block->blockHash, difficulty) == true) {
-           is_mined = 1;
-       } else {
-           block->nonce++;
-       }
-   }
+    block->nonce = 0;
+    compute_block_hash(block, block->blockHash);
+    while (!starts_with_zeros(block->blockHash, difficulty)) {
+        block->nonce++;
+        compute_block_hash(block, block->blockHash);
+    }
 }
 
 
