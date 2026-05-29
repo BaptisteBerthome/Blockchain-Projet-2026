@@ -12,9 +12,15 @@ typedef struct s_tx_request {
 //Fonctions pour les portefeuilles
 void init_wallets(Account wallets[MAX_USERS], int nb_users);
 int find_wallet_by_name(Account wallets[MAX_USERS], int nb_users, const char *name);
+int find_wallet_by_address(Account wallets[MAX_USERS], int nb_users, const char *address);
+// Resolution hybride pour le menu : accepte une adresse OU un mnemonique "userX".
+int resolve_account(Account wallets[MAX_USERS], int nb_users, const char *id);
+// H(pubKey) d'un compte (== identite de l'adresse). 'out' >= HASH160_HEX_LEN.
+void wallet_pubkeyhash(const Account *w, char *out);
 
 //Fonctions pour les blocks
-void add_transaction_to_block(Block *b, const char *sender, const char *receiver, long amount, const char *comment);
+void add_transaction_to_block(Block *b, Account wallets[MAX_USERS], int nb_users,
+	const char *sender, const char *receiver, long amount, const char *comment);
 void create_genesis_block(Blockchain *bc);
 void mine_and_add_block(Blockchain *bc, Block *new_block, Account wallets[MAX_USERS], int nb_users);
 
@@ -31,11 +37,16 @@ bool add_utxo_transaction_to_block(
 	const char *receiver,
 	long amount,
 	const char *comment,
-	long *out_fee
+	long *out_fee,
+	bool verbose // partie 3 : affiche l'execution des scripts
 );
-void add_coinbase_transaction(Block *b, const char *miner_name, long reward, long fees_collected);
-void apply_block_utxo_effects(Block *b, Account wallets[MAX_USERS], int nb_users);
+void add_coinbase_transaction(Block *b, Account wallets[MAX_USERS], int nb_users,
+	const char *miner_name, long reward, long fees_collected);
 void process_market_round(Blockchain *bc, Account wallets[MAX_USERS], int nb_users, int random_tx_count);
+
+// CC4 Part 3: analyse de la blockchain pour reconstruire un wallet par adresse
+void analyze_blockchain_for_address(Blockchain *bc, Account wallets[MAX_USERS],
+	int nb_users, const char *address_or_name);
 
 long get_money_supply(void);
 long get_current_reward(void);

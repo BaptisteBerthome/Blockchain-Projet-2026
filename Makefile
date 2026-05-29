@@ -4,7 +4,13 @@ TARGET = bitthune_exec
 #Compilateur et options
 CC = gcc
 CFLAGS = -Wall -Wextra -g -Iinclude -Ilib -Ilib/Sha256
-#LDFLAGS = -lssl -lcrypto # a decommenter pour la Partie 3 (OpenSSL)
+
+USE_SSL ?= 1
+ifeq ($(USE_SSL),1)
+LDFLAGS = -lssl -lcrypto
+else
+LDFLAGS =
+endif
 
 ifeq ($(OS),Windows_NT)
 MKDIR_P = if not exist $(OBJ_DIR) mkdir $(OBJ_DIR)
@@ -25,6 +31,8 @@ SRC_FILES = $(wildcard $(SRC_DIR)/*.c) \
             $(LIB_DIR)/Sha256/sha256_utils.c
 #fichiers objest dans src et lib
 OBJ_FILES = $(patsubst %.c, $(OBJ_DIR)/%.o, $(notdir $(SRC_FILES)))
+# fichiers de dependances (.d) : permettent de recompiler quand un .h change
+DEP_FILES = $(OBJ_FILES:.o=.d)
 vpath %.c $(SRC_DIR) $(LIB_DIR) $(LIB_DIR)/Sha256
 
 
@@ -35,7 +43,7 @@ $(TARGET): $(OBJ_FILES)
 	$(CC) $(OBJ_FILES) -o $@ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 # Créer le dossier obj s'il n'existe pas
 $(OBJ_DIR):
@@ -44,5 +52,8 @@ $(OBJ_DIR):
 # Nettoyage
 clean:
 	$(CLEAN_CMD)
+
+# Prise en compte des dependances generees (-MMD)
+-include $(DEP_FILES)
 
 .PHONY: all clean

@@ -6,7 +6,7 @@ static void free_tx_outputs_list(Slist *list) {
         Slist *next = current->next;
         TxOutputs *out = (TxOutputs *)current->info;
         if (out != NULL) {
-            for (int i = 0; i < LOCK_SCRIPT_SIZE; i++) {
+            for (int i = 0; i < SCRIPTPUBKEY_SIZE; i++) {
                 free(out->lockingScript[i]);
             }
             free(out);
@@ -20,7 +20,13 @@ static void free_tx_inputs_list(Slist *list) {
     Slist *current = list;
     while (current != NULL) {
         Slist *next = current->next;
-        free(current->info);
+        Utxo *in = (Utxo *)current->info;
+        if (in != NULL) {
+            for (int i = 0; i < SCRIPTSIG_SIZE; i++) {
+                free(in->scriptSig[i]);
+            }
+            free(in);
+        }
         free(current);
         current = next;
     }
@@ -28,14 +34,13 @@ static void free_tx_inputs_list(Slist *list) {
 
 //Ajouter un élément à la fin de la liste
 Slist* Slist_add(Slist *list, void *new_info) {
-    //allocation mémoire
     Slist *new_node = (Slist*)malloc(sizeof(Slist));
     if (new_node == NULL) {
         printf("Erreur d'allocation mémoire pour Slist\n");
-        return list; //Echec
+        return list;
     }
     
-    new_node->info = new_info; //Le pointeur générique pointe vers bloc ou transaction
+    new_node->info = new_info;
     new_node->next = NULL;
 
     //si la liste est vide le nouveau noeud devient le premier
@@ -68,7 +73,6 @@ int Slist_count(Slist *list) {
 
 
 //Libérer les structure, pas le contenue dans ->info
-//pasque on sait aps si c'est un bloc ou une tx
 void Slist_free_nodes(Slist *list) {
     Slist *current = list;
     Slist *next_node;

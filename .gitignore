@@ -55,3 +55,9 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Sorties du projet
+/obj/
+/bitthune_exec
+/blockchain.json
+nul

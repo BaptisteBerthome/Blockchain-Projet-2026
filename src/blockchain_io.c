@@ -27,6 +27,25 @@ static void print_tx_json(FILE *out, const Transaction *tx) {
     fprintf(out, "        \"Receiver\": \"%s\",\n", tx->adReceiver);
     fprintf(out, "        \"Amount\": %ld,\n", tx->txAmount);
     fprintf(out, "        \"NbInputs\": %d,\n", tx->nbInputs);
+
+    fprintf(out, "        \"Inputs\": [\n");
+    Slist *in_node = tx->lstInputs;
+    while (in_node != NULL) {
+        Utxo *in = (Utxo *)in_node->info;
+        fprintf(out, "          {\"prevTxId\": \"%.16s..\", \"index\": %d,\n", in->hash, in->indexOutput);
+        fprintf(out, "           \"signature\": \"%s\",\n", in->signature);
+        fprintf(out, "           \"pubKey\": \"%s\",\n", in->pubKey);
+        fprintf(out, "           \"scriptSig\": \"%s %s\"}",
+                in->scriptSig[0] ? in->scriptSig[0] : "",
+                in->scriptSig[1] ? in->scriptSig[1] : "");
+        if (in_node->next != NULL) {
+            fprintf(out, ",");
+        }
+        fprintf(out, "\n");
+        in_node = in_node->next;
+    }
+    fprintf(out, "        ],\n");
+
     fprintf(out, "        \"NbOutputs\": %d,\n", tx->nbOutputs);
     fprintf(out, "        \"Outputs\": [\n");
 
@@ -35,18 +54,28 @@ static void print_tx_json(FILE *out, const Transaction *tx) {
     while (out_node != NULL) {
         TxOutputs *tx_out = (TxOutputs *)out_node->info;
         const char *owner = "UNKNOWN";
+        const char *pkh = "";
+        char scriptpubkey[256] = "";
         long amount = 0;
         int out_index = idx;
 
         if (tx_out != NULL) {
-            if (tx_out->lockingScript[0] != NULL) {
-                owner = tx_out->lockingScript[0];
-            }
+            owner = (const char *)tx_out->ownerAddress;
+            pkh = (const char *)tx_out->pubKeyHash;
             amount = tx_out->amount;
             out_index = tx_out->outIndex;
+            scriptpubkey[0] = '\0';
+            for (int k = 0; k < SCRIPTPUBKEY_SIZE; k++) {
+                if (tx_out->lockingScript[k] != NULL) {
+                    strncat(scriptpubkey, tx_out->lockingScript[k],
+                            sizeof(scriptpubkey) - strlen(scriptpubkey) - 2);
+                    strncat(scriptpubkey, " ", sizeof(scriptpubkey) - strlen(scriptpubkey) - 1);
+                }
+            }
         }
 
-        fprintf(out, "          {\"index\": %d, \"owner\": \"%s\", \"amount\": %ld}", out_index, owner, amount);
+        fprintf(out, "          {\"index\": %d, \"ownerAddress\": \"%s\", \"pubKeyHash\": \"%s\", \"scriptPubKey\": \"%s\", \"amount\": %ld}",
+                out_index, owner, pkh, scriptpubkey, amount);
         if (out_node->next != NULL) {
             fprintf(out, ",");
         }
@@ -94,9 +123,29 @@ void print_block_json(FILE *out, const Block *block) {
 void print_wallets(Account wallets[MAX_USERS], int nb_users) {
     printf("\n----ETAT DES PORTEFEUILLES----\n");
     for (int i = 0; i < nb_users; i++) {
-        printf("  - %-10s : %ld BT\n", wallets[i].str, wallets[i].balance);
+        printf("  - %-8s (%s) : %ld BT\n", wallets[i].str, wallets[i].address, wallets[i].balance);
     }
     printf("------------------------------\n");
+}
+
+void print_address_book(Account wallets[MAX_USERS], int nb_users) {
+    printf("\n--- CARNET D'ADRESSES ---\n");
+    for (int i = 0; i < nb_users; i++) {
+        printf("  %-6s -> %s (%ld BT)\n", wallets[i].str, wallets[i].address, wallets[i].balance);
+    }
+    printf("-------------------------\n");
+}
+
+void print_wallet_keys(Account wallets[MAX_USERS], int nb_users) {
+    printf("\n======= CLES ET ADRESSES (P2PKH) =======\n");
+    for (int i = 0; i < nb_users; i++) {
+        printf("[%s]\n", wallets[i].str);
+        printf("  Cle privee : %s\n", wallets[i].priv_key);
+        printf("  Cle publique : %s\n", wallets[i].pub_key);
+        printf("  Adresse    : %s\n", wallets[i].address);
+        printf("  Solde      : %ld BT\n", wallets[i].balance);
+    }
+    printf("========================================\n");
 }
 
 void save_blockchain_json(const char *filename, Blockchain *bc, Account wallets[MAX_USERS], int nb_users) {
@@ -124,8 +173,9 @@ void save_blockchain_json(const char *filename, Blockchain *bc, Account wallets[
     fprintf(f, "  ],\n");
     fprintf(f, "  \"wallets\": [\n");
     for (int i = 0; i < nb_users; i++) {
-        fprintf(f, "    {\"name\": \"%s\", \"balance\": %ld}%s\n", 
-                wallets[i].str, wallets[i].balance, (i < nb_users - 1 ? "," : ""));
+        fprintf(f, "    {\"name\": \"%s\", \"address\": \"%s\", \"pubKey\": \"%s\", \"balance\": %ld}%s\n",
+                wallets[i].str, wallets[i].address, wallets[i].pub_key,
+                wallets[i].balance, (i < nb_users - 1 ? "," : ""));
     }
     fprintf(f, "  ]\n");
     fprintf(f, "}\n");

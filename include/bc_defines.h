@@ -1,7 +1,6 @@
 #ifndef __BC_DEFINES__
 #define __BC_DEFINES__
-// Header donné à titre indicatif (en clair vous pouvez l'ignorer et faire le vôtre)
-//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -10,23 +9,7 @@
 #include <time.h>
 #include "sha256.h"
 #include "sha256_utils.h"
-
-#define MAX_BUF 1024
-#define MAX_STRING 64
-#define MAX_BLOCK 15
-#define MAXTX 10 // nb tx par bloc (tests)
-#define DIFFICULTY 4 // difficulté pour le minage
-#define INITIALREWARD 25*1000 // montant de départ de la récompence des mineurs (25k au début)
-#define HELIREWARD 50*1000 // montant de l'helicopter money (50k par utilisateur)
-#define MAX_USERS 3 // nb utilisateurs (tests)
-#define LOCK_SCRIPT_SIZE 4 // (parties 2 et 3)
-#define UNLOCK_SCRIPT_SIZE 3 // (parties 2 et 3)
-#define FEE_RATE 5 //%
-#define HALVING 10 // nombre de blocs pour diviser la récompence
-#define HASHLENGTH SHA256_BLOCK_SIZE*2 + 1
-
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
+#include "bc_config.h" // <-- toutes les #define du projet sont ici
 
 // structure générique de liste non typée (à typer à l'utilisation)
 typedef struct Slist {
@@ -78,15 +61,22 @@ typedef struct transaction {
 
 typedef struct s_TxOutputs { //utxo (parties 2 et 3)
     int outIndex; // numéro
-    char * lockingScript[LOCK_SCRIPT_SIZE];
+    // scriptPubKey P2PKH complet : DUP HASH <H(pubKey)> EQ VER (verrouille par adresse)
+    char * lockingScript[SCRIPTPUBKEY_SIZE];
 		time_t timestamp; // héritage de la tx
     long amount; // in milliPass
+    BYTE pubKeyHash[SHA256_BLOCK_SIZE*2 + 1]; // H(pubKey) du proprietaire == identite de l'adresse
+    BYTE ownerAddress[ADDRESS_STR_LEN]; // adresse P2PKH du proprietaire (ou sentinelle: FEE_POOL...)
   } TxOutputs;
 
 typedef struct utxo{
 	BYTE hash[SHA256_BLOCK_SIZE*2 + 1]; // hash de la tx contenant l'UTXO
 	int indexOutput; // numéro d'ordre dans la list outputs
-	TxOutputs * txOut; // pointeur vers la txOut
+	TxOutputs * txOut; // pointeur vers la txOut (NULL pour une reference d'input)
+	// --- Parties 3/4 : preuve de depense (scriptSig) ---
+	char * scriptSig[SCRIPTSIG_SIZE];          // <sig> <pubKey>
+	BYTE signature[SIG_HEX_LEN];               // partie 4 : champ signature explicite
+	BYTE pubKey[PUBKEY_HEX_LEN];               // partie 4 : champ cle publique explicite
 } Utxo;
 
 typedef struct account {

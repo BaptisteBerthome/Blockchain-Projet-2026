@@ -1,4 +1,5 @@
 #include "../include/blockchain_core.h"
+#include "../include/script.h"
 
 
 #include <stdio.h>
@@ -164,6 +165,100 @@ void compute_merkle_root(const Slist *list_tx, int nb_tx, BYTE out_merkle_root[H
 
 
 
+//------------PARTIE_VALIDATION_UTXO----------------------------------------------
+// Ensemble d'UTXO reconstruit pendant la verification (rejeu de la chaine).
+typedef struct VEntry {
+   char txid[HASHLENGTH];
+   int index;
+   TxOutputs *out; // pour acceder au scriptPubKey
+   struct VEntry *next;
+} VEntry;
+
+static void vset_add(VEntry **set, const char *txid, int index, TxOutputs *out) {
+   VEntry *e = malloc(sizeof(VEntry));
+   if (e == NULL) return;
+   snprintf(e->txid, HASHLENGTH, "%s", txid);
+   e->index = index;
+   e->out = out;
+   e->next = *set;
+   *set = e;
+}
+
+// Retire et renvoie l'UTXO (txid,index) s'il existe ; NULL sinon (=> manquant/double-spend).
+static TxOutputs *vset_take(VEntry **set, const char *txid, int index) {
+   VEntry *prev = NULL, *cur = *set;
+   while (cur != NULL) {
+       if (cur->index == index && strcmp(cur->txid, txid) == 0) {
+           TxOutputs *out = cur->out;
+           if (prev == NULL) *set = cur->next; else prev->next = cur->next;
+           free(cur);
+           return out;
+       }
+       prev = cur;
+       cur = cur->next;
+   }
+   return NULL;
+}
+
+static void vset_free(VEntry *set) {
+   while (set != NULL) {
+       VEntry *next = set->next;
+       free(set);
+       set = next;
+   }
+}
+
+static bool replay_utxo_model(Block *blk, VEntry **set) {
+   Slist *tn = blk->transactions;
+   while (tn != NULL) {
+       Transaction *tx = (Transaction *)tn->info;
+       ScriptContext ctx = { .message = (const char *)tx->txid };
+
+       // 1) inputs : existence + script + pas de double-spend (+ somme des inputs)
+       long in_sum = 0;
+       Slist *in = tx->lstInputs;
+       while (in != NULL) {
+           Utxo *input = (Utxo *)in->info;
+           TxOutputs *spent = vset_take(set, (const char *)input->hash, input->indexOutput);
+           if (spent == NULL) {
+               printf("Bloc %d : UTXO introuvable ou deja depense (double-spend) tx=%.12s.. index=%d\n",
+                      blk->index, input->hash, input->indexOutput);
+               return false;
+           }
+           if (!script_execute(input->scriptSig, spent->lockingScript, &ctx, false)) {
+               printf("Bloc %d : script de depense invalide (signature/adresse) tx=%.12s..\n",
+                      blk->index, tx->txid);
+               return false;
+           }
+           in_sum += spent->amount;
+           in = in->next;
+       }
+
+       // 2) outputs : somme + ajout des nouveaux UTXO (verrouilles par adresse)
+       long out_sum = 0;
+       Slist *on = tx->lstOutputs;
+       while (on != NULL) {
+           TxOutputs *o = (TxOutputs *)on->info;
+           if (o != NULL) {
+               out_sum += o->amount; // inclut la sortie FEE_POOL (la commission)
+               if (o->pubKeyHash[0] != '\0') {
+                   vset_add(set, (const char *)tx->txid, o->outIndex, o);
+               }
+           }
+           on = on->next;
+       }
+
+       if (tx->lstInputs != NULL && in_sum < out_sum) {
+           printf("Bloc %d : desequilibre (creation de monnaie) tx=%.12s.. inputs=%ld outputs=%ld\n",
+                  blk->index, tx->txid, in_sum, out_sum);
+           return false;
+       }
+
+       tn = tn->next;
+   }
+   return true;
+}
+
 //verifie la chaine
 bool verify_chain_integrity(Blockchain *bc) {
    if (bc == NULL) return false;
@@ -172,6 +267,7 @@ bool verify_chain_integrity(Blockchain *bc) {
    Slist *current_node = bc->blocklist;
    Block *previous_block = NULL;
    int index = 0;
+   VEntry *utxo_set = NULL; // partie 3/4 : rejeu du modele UTXO
 
 
    // On parcourt tous les wagons (blocs) du train
@@ -182,9 +278,10 @@ bool verify_chain_integrity(Blockchain *bc) {
        //Est ce que quelqu'un a modifié une transaction dans ce bloc ?
        BYTE merkle_hash[HASHLENGTH];
        compute_merkle_root(current_block->transactions, current_block->nbTx, merkle_hash);
-      
+
        if (strcmp((char *)merkle_hash, (char *)current_block->merkleTree) != 0) {
            printf("Bloc %d : Une transaction a ete modifiee (Merkle faux)\n", index);
+           vset_free(utxo_set);
            return false;
        }
 
@@ -192,39 +289,49 @@ bool verify_chain_integrity(Blockchain *bc) {
        //Est  ce que les données du bloc correspondent a son hash ?
        BYTE hash_calcule[HASHLENGTH];
        compute_block_hash(current_block, hash_calcule);
-      
+
        if (strcmp((char *)hash_calcule, (char *)current_block->blockHash) != 0) {
            printf("Bloc %d : Le hash du bloc est faux\n", index);
+           vset_free(utxo_set);
            return false;
        }
 
 
        //Est ce qu'on est bien accroché au bloc d'avant ? (Sauf Genesis)
        if (index > 0 && previous_block != NULL) {
-          
+
            // Le "previousHash" de mon bloc actuel doit être égal au "blockHash" du bloc d'avant
            if (strcmp((char *)current_block->previousHash, (char *)previous_block->blockHash) != 0) {
                printf("Bloc %d : Lien casse avec le block precedent\n", index);
+               vset_free(utxo_set);
                return false;
            }
-          
+
 
 
            //Est ce que le bloc respecte bien la difficulté ?
            if (starts_with_zeros(current_block->blockHash, bc->difficulty) == false) {
                printf("Bloc %d : La difficulté du minage est pas respectee\n", index);
+               vset_free(utxo_set);
                return false;
            }
        }
 
 
-      
+       // Validation complete du modele UTXO (existence + scripts + double-spend)
+       if (!replay_utxo_model(current_block, &utxo_set)) {
+           vset_free(utxo_set);
+           return false;
+       }
+
+
        previous_block = current_block;
        current_node = current_node->next;
        index++;
    }
 
 
-   printf("La blockchain est valide\n");
+   vset_free(utxo_set);
+   printf("La blockchain est valide (Merkle + hash + liens + difficulte + scripts/UTXO + conservation valeur)\n");
    return true;
 }

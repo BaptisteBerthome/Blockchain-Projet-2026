@@ -15,7 +15,6 @@ int nb_utilisateurs = 3;
 bool est_prete = false;
 static volatile sig_atomic_t stop_market_loop = 0;
 
-static const int HALVING_LIMIT = 30;
 
 static void on_sigint_market(int sig) {
     (void)sig;
@@ -86,23 +85,24 @@ void action_nouvelle_tx() {
         return;
     }
 
-    char sender[MAX_STRING];
-    char receiver[MAX_STRING];
+    char sender[64];
+    char receiver[64];
     long amount;
     char comment[MAX_STRING];
 
-    printf("Entrez le nom de l'envoyeur (ex: user1) : ");
+    print_address_book(wallets, nb_utilisateurs);
+    printf("Entrez l'envoyeur (adresse OU userX) : ");
     scanf("%63s", sender);
-    printf("Entrez le nom du receveur (ex: user2) : ");
+    printf("Entrez le receveur (adresse OU userX) : ");
     scanf("%63s", receiver);
     printf("Entrez le montant en Bit-Thunes : ");
     scanf("%ld", &amount);
     printf("Entrez un commentaire pour la transaction : ");
     scanf("%63s", comment);
 
-    if (find_wallet_by_name(wallets, nb_utilisateurs, sender) == -1 ||
-        find_wallet_by_name(wallets, nb_utilisateurs, receiver) == -1) {
-        printf("Sender/receiver invalide. Utilisez des noms user1..user%d\n", nb_utilisateurs);
+    if (resolve_account(wallets, nb_utilisateurs, sender) == -1 ||
+        resolve_account(wallets, nb_utilisateurs, receiver) == -1) {
+        printf("Envoyeur/receveur invalide. Utilisez une adresse ou user1..user%d\n", nb_utilisateurs);
         return;
     }
 
@@ -118,14 +118,14 @@ void action_nouvelle_tx() {
     }
 
     long fee = 0;
-    if (!add_utxo_transaction_to_block(block, wallets, nb_utilisateurs, sender, receiver, amount, comment, &fee)) {
+    if (!add_utxo_transaction_to_block(block, wallets, nb_utilisateurs, sender, receiver, amount, comment, &fee, true)) {
         printf("Transaction rejetee (solde UTXO insuffisant ou donnees invalides).\n");
         free(block);
         return;
     }
 
     blockchain.reward4mining = get_current_reward();
-    add_coinbase_transaction(block, block->minerName, get_current_reward(), fee);
+    add_coinbase_transaction(block, wallets, nb_utilisateurs, block->minerName, get_current_reward(), fee);
     mine_and_add_block(&blockchain, block, wallets, nb_utilisateurs);
 
     advance_reward_schedule();
@@ -201,6 +201,30 @@ void action_sauvegarder() {
     printf("Fichier enregistre avec succes !\n");
 }
 
+void action_afficher_cles() {
+    printf("\n[INFO] Cles et adresses des utilisateurs...\n");
+    if (!est_prete) {
+        printf("Initialisez la blockchain dabord.\n");
+        return;
+    }
+    print_wallet_keys(wallets, nb_utilisateurs);
+}
+
+void action_analyser_adresse() {
+    printf("\n[INFO] Analyse de la blockchain par adresse...\n");
+    if (!est_prete) {
+        printf("Initialisez la blockchain dabord.\n");
+        return;
+    }
+
+    char cible[64];
+    print_address_book(wallets, nb_utilisateurs);
+    printf("Entrez un nom (user1), une adresse ou un H(pubKey) : ");
+    scanf("%63s", cible);
+
+    analyze_blockchain_for_address(&blockchain, wallets, nb_utilisateurs, cible);
+}
+
 void action_quitter() {
     if (est_prete) {
         printf("Sauvegarde automatique avant fermeture...\n");
@@ -221,7 +245,7 @@ int main() {
     int choix = 0;
 
     //choix
-    while (choix != 7) {
+    while (choix != 9) {
         printf("\n=== MENU PRINCIPAL ===\n");
         printf("1. Initialiser la blockchain\n");
         printf("2. Creer une transaction UTXO\n");
@@ -229,7 +253,9 @@ int main() {
         printf("4. Verifier la chaine\n");
         printf("5. Sauvegarder en JSON\n");
         printf("6. Lancer la phase marche (infinie)\n");
-        printf("7. Quitter\n");
+        printf("7. Afficher les cles et adresses (P2PKH)\n");
+        printf("8. Analyser la blockchain par adresse\n");
+        printf("9. Quitter\n");
         printf("Votre choix : ");
         
         //sécurité si l'utilisateur tape une lettre au lieu d'un chiffre
@@ -261,10 +287,16 @@ int main() {
                 action_phase_marche();
                 break;
             case 7:
+                action_afficher_cles();
+                break;
+            case 8:
+                action_analyser_adresse();
+                break;
+            case 9:
                 action_quitter();
                 break;
             default:
-                printf("Choix invalide. Veuillez taper un chiffre entre 1 et 7.\n");
+                printf("Choix invalide. Veuillez taper un chiffre entre 1 et 9.\n");
                 break;
         }
     }
