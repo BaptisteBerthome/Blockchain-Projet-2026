@@ -49,7 +49,17 @@ static void advance_reward_schedule(void) {
         if (reward > 0) {
             set_current_reward(reward / 2);
             increment_halving_count();
-            printf("[HALVING] cycle=%d nouvelle reward=%ld BT\n", get_cycle_rounds(), get_current_reward());
+            printf("[HALVING] cycle=%d nouvelle reward=%ld BT\n",
+                   get_cycle_rounds(), get_current_reward());
+
+            if (get_current_reward() == 0) {
+                printf("\n========================================\n");
+                printf("FIN DE LA PHASE D'INFLATION !\n");
+                printf("Masse monetaire finale : %ld BT\n", get_money_supply());
+                printf("Nombre de cycles de halving : %d\n", get_halving_count());
+                printf("Le minage continue sur les frais uniquement.\n");
+                printf("========================================\n\n");
+            }
         }
     }
 }
