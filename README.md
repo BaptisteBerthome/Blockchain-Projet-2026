@@ -5,6 +5,8 @@ Projet réalisé dans le cadre de la licence informatique a l'université de Tou
 ## Présentation du Projet
 Ce projet est une implémentation complète d'une blockchain centralisée nommée BitThune
 
+* **Langage utilisé :** C
+
 ## Présentation de l'équipe 60
 L'équipe 60 est composée de :
   - BENAMAR Fadi
@@ -12,8 +14,6 @@ L'équipe 60 est composée de :
   - GOUL Raphaël
   - JANET Aurélien
   - KAMYSH Artem
-
-* **Langage utilisé :** C
 
 ## Installation & Utilisation
 
