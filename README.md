@@ -28,7 +28,7 @@ Depuis la racine du projet il faut utiliser dans le terminal `make`. Un fichier 
 Vous pouvez lancer l'application via `./bitthune_exec`.
 
 Pour la modification du nombre d'utilisateurs il faut :
-- Ce rendre dans `/include/bc_config.h` ligne 16, modifier le champ `MAX_USERS` et `MAXTX`le mettre au nombre souhaiter (de préférence mettez `MAXTX` au même nombre que `MAX_USERS`). 
+- Ce rendre dans `/include/bc_config.h` ligne 16, modifier le champ `MAX_USERS` et `MAXTX` et le mettre au nombre souhaiter (de préférence mettez `MAXTX` au même nombre que `MAX_USERS`). 
 - Ce rendre dans `/src/main.c` ligne 14, modifier le champ `nb_utilisateurs` et le mettre au nombre souhaiter.
 
 ## Performance & Limitations
