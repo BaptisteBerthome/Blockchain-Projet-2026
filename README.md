@@ -25,7 +25,7 @@ L'équipe 60 est composée de :
 Depuis la racine du projet il faut utiliser dans le terminal `make`. Un fichier `bitthune_exec` sera générer.
 
 ### Execution
-Vous pouvez lancer l'application via `./bitthune_exec`.<
+Vous pouvez lancer l'application via `./bitthune_exec`.
 
 Pour la modification du nombre d'utilisateurs il faut :
 - Ce rendre dans `/include/bc_config.h` ligne 16, modifier le champ `MAX_USERS`.
